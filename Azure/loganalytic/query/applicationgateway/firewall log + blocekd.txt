@@ -1,0 +1,13 @@
+#blocked
+
+AzureDiagnostics
+| where ResourceProvider == "Microsofot.Network" and Category == "ApplicationGatewayFirewallog"
+| where requestUri_s == "/" and action_s == "Blocked"
+| summarize count() by ruleId_s
+
+
+
+
+#Firewall logs 
+
+AzureDiagnostics | where ResourceType == "APPLICATIONGATEWAYS" and Category == "ApplicationGatewayFirewallLog"
