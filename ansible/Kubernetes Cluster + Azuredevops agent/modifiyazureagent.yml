@@ -1,0 +1,7 @@
+---
+-  hosts: azure-devops-test
+   vars_files:
+    - ~/git/AzureDevopsCI/Ansible-All/defaults/main.yml
+   become: true
+   roles:
+    - azure_agent_add_configuration

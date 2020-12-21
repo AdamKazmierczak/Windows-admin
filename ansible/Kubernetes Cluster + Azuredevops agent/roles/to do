@@ -1,0 +1,8 @@
+
+add local admin during deployment with secret password.
+//create vault file
+
+Create general role ansible for adding agent
+
+Create specific role for analytic team.
+

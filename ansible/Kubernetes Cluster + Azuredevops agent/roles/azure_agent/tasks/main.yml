@@ -1,0 +1,272 @@
+- name: Set agent config facts
+  set_fact:
+    agent_cmd_args:
+      - "./config.sh"
+      - "--unattended"
+      - "--acceptteeeula"
+      - "--agent '{{ az_devops_agent_name }}'"
+      - "--url '{{ az_devops_server_url }}'"
+      - "--work _work"
+      - "--auth PAT"
+      - "--token '{{ az_devops_accesstoken }}'"
+      - "--runasservice"
+    build_agent_cmd_args:
+      - "--pool '{{ az_devops_agent_pool_name }}'"
+    deployment_agent_cmd_args:
+      - "--deploymentgroup"
+      - "--deploymentgroupname '{{ az_devops_deployment_group_name }}'"
+      - "--addDeploymentGroupTags"
+      - "--deploymentGroupTags '{{ az_devops_deployment_group_tags }}'"
+      - "--projectname '{{ az_devops_project_name }}'"
+
+- name: Install requirements
+  package:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - libcurl3
+    - libunwind8
+  register: result
+  until: result is succeeded
+
+- name: Add a agent user
+  user:
+    name: "{{ az_devops_agent_user }}"
+    comment: "Azure DevOps Agent"
+    shell: /bin/bash
+
+- name: create docker group
+  group:
+    name: docker
+    state: present
+
+
+- name: add azure_devops_agent user to proper group
+  user:
+    name: az_devops_agent
+    shell: /bin/bash
+    groups: docker,sudo
+    append: yes
+
+- name : add user administrator to to root and docker groups
+  user:
+    name: administrator
+    shell: /bin/bash
+    groups: docker,sudo
+    append: yes
+
+- name: add sudoers admin / no password for admin group
+  lineinfile:
+    path: /etc/sudoers
+    state: present
+    regexp: '%admin'
+    line: '%admin ALL=(ALL) NOPASSWD: ALL'
+
+- name: Create directories
+  file:
+    state: directory
+    path: "{{ item }}"
+    owner: "{{ az_devops_agent_user }}"
+    group: "{{ az_devops_agent_user }}"
+    mode: 0755
+  loop:
+    - "{{ az_devops_agent_folder }}"
+    - "{{ az_devops_work_folder }}"
+
+- name: Create directories which might be missing
+  file:
+    state: directory
+    path: "{{ az_devops_add_missing_folder2 }}"
+    owner: "{{ az_devops_accountname2 }}"
+    group: "{{ az_devops_accountname2 }}"
+    mode: 0755
+
+- name: Download and unarchive
+  unarchive:
+    src: "{{ az_devops_agent_package_url }}"
+    dest: "{{ az_devops_agent_folder }}"
+    remote_src: yes
+    owner: "{{ az_devops_agent_user }}"
+    group: "{{ az_devops_agent_user }}"
+    creates: "{{ az_devops_agent_folder }}/config.sh"
+
+- name: Register agent service status
+  shell: ./svc.sh status | grep -q \(running\)
+  become: true
+  args:
+    chdir: "{{ az_devops_agent_folder }}"
+  changed_when: false
+  failed_when: service_running.rc not in [0,1]
+  register: service_running
+
+- name: Uninstall agent service
+  command: ./svc.sh uninstall
+  become: true
+  args:
+    chdir: "{{ az_devops_agent_folder }}"
+    removes: "{{ az_devops_agent_folder }}/runsvc.sh"
+  when: service_running.rc == 0
+
+- name: Unconfigure agent
+  command: "./config.sh remove --auth PAT --token {{ az_devops_accesstoken }}"
+  args:
+    chdir: "{{ az_devops_agent_folder }}"
+    removes: "{{ az_devops_agent_folder }}/.agent"
+  become: true
+  become_user: "{{ az_devops_agent_user }}"
+  when: service_running.rc == 0
+
+- name: Add '--replace' configuration argument
+  set_fact:
+    build_agent_cmd_args: "{{ build_agent_cmd_args }} + ['--replace']"
+    deployment_agent_cmd_args: "{{ build_agent_cmd_args }} + ['--replace']"
+  when: az_devops_agent_replace_existing
+
+- name: Configure agent as build server
+  command: "{{ (agent_cmd_args + build_agent_cmd_args) | join(' ') }}"
+  args:
+    chdir: "{{ az_devops_agent_folder }}"
+    creates: "{{ az_devops_agent_folder }}/.agent"
+  become: true
+  become_user: "{{ az_devops_agent_user }}"
+  when:
+    - az_devops_agent_role == 'build'
+
+- name: Configure agent as deployment server
+  command: "{{ (agent_cmd_args + deployment_agent_cmd_args) | join(' ') }}"
+  args:
+    chdir: "{{ az_devops_agent_folder }}"
+    creates: "{{ az_devops_agent_folder }}/.agent"
+  become: true
+  become_user: "{{ az_devops_agent_user }}"
+  when:
+    - az_devops_agent_role == 'deployment'
+
+- name: Install agent service
+  command: ./svc.sh install {{ az_devops_agent_user }}
+  become: true
+  args:
+    chdir: "{{ az_devops_agent_folder }}"
+
+- name: Copy unit file
+  become: true
+  template:
+    src: azure_devops_agent.service.j2
+    dest: /usr/lib/systemd/system/azure_devops_agent.service
+#  notify: restart az-devops-agent
+
+- name: ensure az-devops-agent is enabled on boot
+  become: true
+  systemd:
+    daemon_reload: true
+    state: started
+    name: azure_devops_agent
+
+- name: start azure agent
+  command: ./svc.sh start
+  become: true
+  args:
+    chdir: "{{ az_devops_agent_folder }}"
+
+- name: DOCKER Add Docker Repository
+  apt_repository:
+    repo: deb [arch=amd64] https://download.docker.com/linux/ubuntu bionic stable
+    state: present
+
+- name: DOCKER Add an Apt signing key, uses whichever key is at the URL for Docker
+  apt_key:
+    url: https://download.docker.com/linux/ubuntu/gpg
+    state: present
+
+- name: install apt get update
+  command: sudo apt-get update -y
+  become: true
+
+- name: install Common components
+  action: >
+    {{ ansible_pkg_mgr }} name={{ item }} state=present update_cache=yes
+  with_items:
+    - apt-transport-https
+    - ca-certificates
+    - curl
+    - gnupg-agent
+    - software-properties-common
+    - python3-distutils
+    - python-dev
+    - python3-dev
+    - build-essential
+    - libssl-dev
+    - libffi-dev
+    - libxml2-dev
+    - libxslt1-dev
+    - zlib1g-dev
+    - python-pip
+    - libpq-dev
+
+- name: DOCKER / Install
+  action: >
+    {{ ansible_pkg_mgr }} name={{ item }} state=present update_cache=yes
+  with_items:
+    - docker-ce
+    - docker-ce-cli
+    - containerd.io
+
+- name: PYTHON / Curl pipy.py python
+  command: curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py
+  become: true
+
+- name: PYTHON / add symbolic link
+  file: 
+    src: /usr/bin/python3
+    dest: /usr/bin/python
+    owner: root
+    group: root
+    state: link
+
+- name: PYTHON / install pip
+  command:  python get-pip.py
+  become: true
+
+- name: install python virtual env 20.0.1 or higher
+  command: pip install virtualenv
+  become: true
+
+- name: Kubernetes Components
+  command: curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg
+  become: true
+
+- name: Kubernetes Add an Apt signing key, uses whichever key is at the URL for Docker
+  apt_key:
+    url: https://packages.cloud.google.com/apt/doc/apt-key.gpg
+    state: present
+
+- name: Kubernetes Repository
+  apt_repository:
+    repo: deb [arch=amd64] https://apt.kubernetes.io/ kubernetes-xenial main
+    state: present
+
+- name: install apt get update
+  command: sudo apt-get update -y
+  become: true
+
+- name: install gnupg package
+  command: sudo apt-get install -y gnupg2
+  become: true
+
+- name: install pass package
+  command: sudo apt install pass -y
+  become: true
+
+- name: update docker compose do version 1.27.4
+  command: sudo curl -L "https://github.com/docker/compose/releases/download/1.27.4/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+  become: true
+
+#- name: curl helm
+#  shell: curl https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 |bash -
+#  become: true
+
+- name: install unzip
+  command: sudo apt-get install -y unzip
+  become: true
+
+

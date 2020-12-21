@@ -1,0 +1,43 @@
+- name: copy kubeconfig to user folder
+  command: sudo mkdir -p $HOME/.kube
+  become: true
+
+- name: cp config
+  command:  cp  /etc/kubernetes/admin.conf $HOME/.kube/config
+  become: true
+
+
+- name: copy admin.conf to user's kube config
+  copy:
+   src: /etc/kubernetes/admin.conf
+   dest: /home/ubuntu/.kube/config
+   remote_src: yes
+   owner: ubuntu
+
+
+#- name: Copy file with owner and permissions
+#  copy: src={{ item.src }} dest={{ item.dest }}
+#    owner: ubuntu
+#    group: ubuntu
+#    mode: '0644'
+#  with_items:
+#    - { src: '/home/ubuntu/git/AzureDevopsCI/kubernetes-node/roles/configure-node-master/tasks/startceph-pod.sh', dest: '/etc/systemd/system/startceph-pod.sh' }
+#    - { src: '/home/ubuntu/git/AzureDevopsCI/kubernetes-node/roles/configure-node-master/tasks/startceph-pod.sh', dest: '/etc/systemd/system/startceph-pod.sh3' }
+#    #dest: /etc/systemd/system/startceph-pod.sh2
+#    owner: ubuntu
+#    group: ubuntu
+ #   mode: '0644'
+
+- name: Copy CA files
+  copy:
+    src: '{{item}}'
+    dest: '/etc/systemd/system/'
+    owner: ubuntu
+    group: ubuntu
+    mode: 0644
+    backup: no
+  loop:
+    -  pauseceph-pod.sh
+    -  startceph-pod.sh
+    -  cephstart.service
+    -  cephpause.service

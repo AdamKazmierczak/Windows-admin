@@ -1,0 +1,144 @@
+- name: create docker group
+  group:
+    name: docker
+    state: present
+
+
+- name: add azure_devops_agent user to proper group
+  user:
+    name: az_devops_agent
+    shell: /bin/bash
+    groups: docker,sudo
+    append: yes
+
+- name : add user administrator to to root and docker groups
+  user:
+    name: administrator
+    shell: /bin/bash
+    groups: docker,sudo
+    append: yes
+
+- name: add sudoers admin / no password for admin group
+  lineinfile:
+    path: /etc/sudoers
+    state: present
+    regexp: '%admin'
+    line: '%admin ALL=(ALL) NOPASSWD: ALL'
+
+- name: DOCKER Add Docker Repository
+  apt_repository:
+    repo: deb [arch=amd64] https://download.docker.com/linux/ubuntu bionic stable
+    state: present
+
+- name: DOCKER Add an Apt signing key, uses whichever key is at the URL for Docker
+  apt_key:
+    url: https://download.docker.com/linux/ubuntu/gpg
+    state: present
+
+- name: install apt get update
+  command: sudo apt-get update -y
+  become: true
+
+- name: install Common components
+  action: >
+    {{ ansible_pkg_mgr }} name={{ item }} state=present update_cache=yes
+  with_items:
+    - apt-transport-https
+    - ca-certificates
+    - curl
+    - gnupg-agent
+    - software-properties-common
+    - python3-distutils
+    - python-dev
+    - python3-dev
+    - build-essential
+    - libssl-dev
+    - libffi-dev
+    - libxml2-dev
+    - libxslt1-dev
+    - zlib1g-dev
+    - python-pip
+    - libpq-dev
+
+- name: DOCKER / Install
+  action: >
+    {{ ansible_pkg_mgr }} name={{ item }} state=present update_cache=yes
+  with_items:
+    - docker-ce
+    - docker-ce-cli
+    - containerd.io
+
+- name: PYTHON / Curl pipy.py python
+  command: curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py
+  become: true
+
+- name: PYTHON / add symbolic link
+  file: 
+    src: /usr/bin/python3
+    dest: /usr/bin/python
+    owner: root
+    group: root
+    state: link
+
+- name: PYTHON / install pip
+  command:  python get-pip.py
+  become: true
+
+- name: install python virtual env 20.0.1 or higher
+  command: pip install virtualenv
+  become: true
+
+- name: install python virtual env to specific version 20.3.1
+  command: python -m pip install -U pip==20.3.1
+  become: true
+
+- name: Kubernetes Components
+  command: curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg
+  become: true
+
+- name: Kubernetes Add an Apt signing key, uses whichever key is at the URL for Docker
+  apt_key:
+    url: https://packages.cloud.google.com/apt/doc/apt-key.gpg
+    state: present
+
+- name: Kubernetes Repository
+  apt_repository:
+    repo: deb [arch=amd64] https://apt.kubernetes.io/ kubernetes-xenial main
+    state: present
+
+- name: install apt get update
+  command: sudo apt-get update -y
+  become: true
+
+- name: install gnupg package
+  command: sudo apt-get install -y gnupg2
+  become: true
+
+- name: install pass package
+  command: sudo apt install pass -y
+  become: true
+
+- name: Install Docker Compose (if configured).
+  get_url:
+    url: https://github.com/docker/compose/releases/download/{{ docker_compose_version }}/docker-compose-Linux-x86_64
+    dest: "{{ docker_compose_path }}"
+    mode: 0755
+
+- name: install helm in version 3.3
+  command: sudo snap install --classic --channel=3.3/stable helm
+  become: true
+
+- name: install unzip
+  command: sudo apt-get install -y unzip
+  become: true
+
+
+- name: add  lines in journald.con =SystemMaxUse=2G
+  lineinfile:
+    path: /etc/systemd/journald.conf
+    state: present
+    line: 'SystemMaxUse=2G'
+
+- name: add curl Azure CLIDeb
+  command: curl -sL https://aka.ms/InstallAzureCLIDeb
+  become: true

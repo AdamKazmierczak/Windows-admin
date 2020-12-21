@@ -1,0 +1,1 @@
+﻿Set-MailboxFolderPermission -Identity username@powel.com:\calendar -User Default -AccessRights Reviewer

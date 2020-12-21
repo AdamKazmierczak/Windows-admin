@@ -1,0 +1,13 @@
+[Unit]
+Description= Pause ceph cluster for maintenance /gracufull shutdown
+
+[Service]
+#Type=oneshot
+User=ubuntu
+#WorkingDirectory=/etc/systemd/system
+#ExecStart=/bin/bash /home/ubuntu/pause.sh
+ExecStart=/bin/bash /etc/systemd/system/pauseceph-pod.sh
+#KillMode=process
+
+[Install]
+WantedBy=multi-user.target

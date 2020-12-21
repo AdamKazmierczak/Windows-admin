@@ -1,0 +1,22 @@
+---
+-  hosts: all-linux
+
+   vars:
+     - devops_password: Powel2018
+   gather_facts: yes
+   remote_user: administrator
+   become: yes
+   become_user: root
+   become_method: sudo
+
+
+
+   tasks:
+   #  - name: create docker group
+   #    group:
+   #      name: docker
+   #      state: present
+
+     - name: ncdu install
+       command:  sudo snap install ncdu
+       become: true

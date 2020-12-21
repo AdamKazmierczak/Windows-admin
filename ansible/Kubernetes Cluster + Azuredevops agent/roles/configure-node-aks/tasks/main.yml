@@ -1,0 +1,186 @@
+- name: Install requirements
+  package:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - libcurl3
+    - libunwind8
+  register: result
+  until: result is succeeded
+
+- name: disable swap off
+  command:  swapoff -a
+  become: true
+
+- name: edit etc/fstab / permament swap off
+  command: sed -i '/ swap / s/^/#/' /etc/fstab
+  become: true
+
+- name: install ssh server
+  command: sudo apt-get install -y openssh-server
+  become: true
+
+- name: create docker group
+  group:
+    name: docker
+    state: present
+
+- name: install net-tools
+  command: sudo apt-get install -y net-tools
+  become: true
+
+- name : add user ubuntu to to root and docker groups
+  user:
+    name: ubuntu
+    shell: /bin/bash
+    groups: docker,sudo
+    append: yes
+
+- name: add sudoers ubuntu / no password for admin group
+  lineinfile:
+    path: /etc/sudoers
+    state: present
+    regexp: '%ubuntu'
+    line: '%ubuntu ALL=(ALL) NOPASSWD: ALL'
+
+- name: DOCKER Add Docker Repository
+  apt_repository:
+    repo: deb [arch=amd64] https://download.docker.com/linux/ubuntu bionic stable
+    state: present
+
+- name: DOCKER Add an Apt signing key, uses whichever key is at the URL for Docker
+  apt_key:
+    url: https://download.docker.com/linux/ubuntu/gpg
+    state: present
+
+- name: install apt get update
+  command: sudo apt-get update -y
+  become: true
+
+- name: install Common components
+  action: >
+    {{ ansible_pkg_mgr }} name={{ item }} state=present update_cache=yes
+  with_items:
+    - apt-transport-https
+    - ca-certificates
+    - curl
+    - gnupg-agent
+    - software-properties-common
+    - python3-distutils
+    - python-dev
+    - python3-dev
+    - build-essential
+    - libssl-dev
+    - libffi-dev
+    - libxml2-dev
+    - libxslt1-dev
+    - zlib1g-dev
+    - python-pip
+    - libpq-dev
+
+- name: docker install 19.03 version
+  command: sudo apt-get install -y 'docker-ce=5:19.03.13~3-0~ubuntu-bionic' 'docker-ce-cli=5:19.03.13~3-0~ubuntu-bionic' 'containerd.io'
+  become: true
+
+- name: PYTHON / Curl pipy.py python
+  command: curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py
+  become: true
+
+- name: PYTHON / add symbolic link
+  file: 
+    src: /usr/bin/python3
+    dest: /usr/bin/python
+    owner: root
+    group: root
+    state: link
+
+- name: PYTHON / install pip
+  command:  python get-pip.py
+  become: true
+
+- name: install python virtual env 20.0.1 or higher
+  command: pip install virtualenv
+  become: true
+
+- name: Kubernetes Components
+  command: curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg
+  become: true
+
+- name: Kubernetes Add an Apt signing key, uses whichever key is at the URL for Docker
+  apt_key:
+    url: https://packages.cloud.google.com/apt/doc/apt-key.gpg
+    state: present
+
+- name: Kubernetes Repository
+  apt_repository:
+    repo: deb [arch=amd64] https://apt.kubernetes.io/ kubernetes-xenial main
+    state: present
+
+- name: install apt get update
+  command: sudo apt-get update -y
+  become: true
+
+- name: install kubelet Kubernetes
+  command:  sudo apt-get install -qy kubelet=1.17.11-00 kubeadm=1.17.11-00 kubectl=1.17.11-00 kubernetes-cni=0.8.6-00
+  become: true
+
+- name: hold kubernetes version
+  command: apt-mark hold hold kubelet=1.17.11-00 kubeadm=1.17.11-00 kubectl=1.17.11-00 kubernetes-cni=0.8.6-0
+  become: true
+  ignore_errors: yes
+
+- name: install gnupg package
+  command: sudo apt-get install -y gnupg2
+  become: true
+
+- name: install pass package
+  command: sudo apt install pass -y
+  become: true
+
+- name: Ansible create file with content unsecure registry docker acces
+  copy:
+    dest: "/etc/docker/daemon.json"
+    content: |
+      { "insecure-registries": ["registry.tdtrhk8shap001.powelasa.powel.com","registry.tdgdak8lha001.powelasa.powel.com"] }
+
+- name: Run restart systemctl 
+  command: sudo systemctl daemon-reload
+  become: true
+
+- name: restart Docker
+  command: sudo systemctl restart docker
+  become: true
+
+- name: Run ip tables FORWARD Accept
+  command: sudo iptables -P FORWARD ACCEPT
+  become: true
+
+- name: prevent the iptables-peristent install dialog
+  debconf: name=iptables-persistent question={{ item }} vtype=boolean value=true
+  with_items:
+  - iptables-persistent/autosave_v4
+  - iptables-persistent/autosave_v6
+
+- name: install iptables-persistent
+  apt: name=iptables-persistent
+  become: true
+
+- name: save iptables in current settings
+  comand:  sudo iptables-save
+  become: true
+
+- name: ncdu install
+  command:  sudo apt-get install ncdu
+  become: true
+
+#- name: copy kubeconfig to user folder
+#  command: sudo mkdir -p $HOME/.kube
+#  become: true
+#- name: cp config
+#  command: sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+#  become: true
+#- name : chown file to usable permissions
+#  command: sudo chown $(id -u):$(id -g) $HOME/.kube/config
+#  become: true
+
+

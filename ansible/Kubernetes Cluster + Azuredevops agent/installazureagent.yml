@@ -1,0 +1,24 @@
+---
+-  hosts: azure-devops-test
+   become: true
+   roles:
+    - azure_agent
+   vars:
+    - az_devops_agent_role: build
+    - az_devops_accountname: yourexamplemailaddres@powel.com
+    - az_devops_accesstoken: somexampletoken3333333
+    - az_devops_agent_name: "{{ ansible_hostname }}"
+    - az_devops_server_url: "https://dev.azure.com/powelanalytics"
+    - az_devops_agent_pool_name: "Default"
+    - az_devops_deployment_group_name: "Default"
+    - az_devops_deployment_group_tags: null
+    - az_devops_project_name: null
+    - az_devops_agent_user: "az_devops_agent"
+    - az_devops_agent_folder: "/home/{{ az_devops_agent_user }}/agent/"
+    - az_devops_work_folder: "/home/{{ az_devops_agent_user }}/agent/_work"
+    - az_devops_add_missing_folder: "/etc/systemd/system"
+    - az_devops_add_missing_folder2: "/usr/lib/systemd/system"
+    - az_devops_agent_version: 2.160.0
+    - az_devops_agent_replace_existing: true
+    - az_devops_agent_package_url: "https://vstsagentpackage.azureedge.net/agent/2.160.0/vsts-agent-linux-x64-2.160.0.tar.gz"
+    - az_devops_accountname2: root

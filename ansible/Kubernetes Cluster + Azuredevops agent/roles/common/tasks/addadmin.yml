@@ -1,0 +1,52 @@
+
+---
+ - hosts: kubernetes-rl-dev-cluster
+   vars:
+     - devops_password: Powel2018
+   gather_facts: yes
+   remote_user: administrator
+   become: yes
+   become_user: root
+   become_method: sudo
+#   tasks:
+#     - name: Add a new user named administratoo
+#       user:
+#          name: administrator
+#          shell: /bin/bash
+#          password: "{{ devops_password | password_hash ('sha512', 'A512')}}"
+#     - name: Add devops user to the sudoers
+#       copy:
+#          dest: "/etc/sudoers.d/administrator"
+#          content: "administrator  ALL=(ALL)  NOPASSWD: ALL"
+
+
+
+   tasks:
+     - name: create docker group
+       group:
+         name: docker
+         state: present
+
+     - name: Add a new user named administrator
+       user:
+         name: ubuntu
+         shell: /bin/bash
+         password: "{{ devops_password | password_hash ('sha512', 'A512')}}"
+
+
+     - name : add user administrator to to root and docker groups
+       user:
+         name: ubuntu
+         shell: /bin/bash
+         groups: docker,sudo
+         append: yes
+
+     - name: add sudoers admin / no password for admin group
+       lineinfile:
+         path: /etc/sudoers
+         state: present
+         regexp: '%admin'
+         line: '%admin ALL=(ALL) NOPASSWD: ALL'
+
+
+

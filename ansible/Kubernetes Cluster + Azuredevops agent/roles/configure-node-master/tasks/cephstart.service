@@ -1,0 +1,12 @@
+[Unit]
+Description= Pause ceph cluster for maintenance /gracufll start
+
+[Service]
+User=ubuntu
+#WorkingDirectory=/etc/systemd/system
+ExecStart=/bin/bash /etc/systemd/system/startceph-pod.sh
+#Restart=always
+
+[Install]
+WantedBy=multi-user.target
+

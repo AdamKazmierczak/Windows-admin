@@ -1,0 +1,10 @@
+---
+#-  hosts: Adam-test-env-k8s
+#   become: true
+#   roles:
+#    - configure-node-aks
+
+-  hosts: Adam-test-env-k8s-master
+   become: true
+   roles:
+    - configure-node-aks

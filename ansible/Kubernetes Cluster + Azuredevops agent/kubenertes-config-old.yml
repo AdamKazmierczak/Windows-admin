@@ -1,0 +1,6 @@
+---
+-  hosts: adka-cluster-test
+   become: true
+   roles:
+    - configure-node-aks
+

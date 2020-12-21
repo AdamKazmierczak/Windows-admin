@@ -1,0 +1,10 @@
+---
+#-  hosts: Adam-test-env-k8s
+#   become: true
+#   roles:
+#    - configure-node-aks
+
+-  hosts: big-analytic-cluster-Master
+   become: true
+   roles:
+    - configure-node-master
